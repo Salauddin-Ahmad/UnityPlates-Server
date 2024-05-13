@@ -43,23 +43,22 @@ async function run() {
     });
     
 
-    
-    
     // // POST endpoint to add data to the requestedfoods collection
     app.post("/requestedfoods", async (req, res) => {
       const requestedFood = req.body;
       const result = await requstedCollection.insertOne(requestedFood);
       res.send(result);
-      console.log(result)
+      // console.log(result)
     });
 
-    // get the requested food from the database
-    app.get("/getMyFoods", async (req, res) => {
+
+    // get the requested food from the database || requsted foods
+    app.get("/getMyFoods/:email", async (req, res) => {
       const result = await requstedCollection
-      .find({})
+      .find({ email: req.params.email })
       .toArray();
       res.send(result);
-      console.log(result);
+      // console.log(result);
     });
     
     
@@ -94,6 +93,21 @@ async function run() {
         // console.log(result);
       });
       
+
+      // get the all foods by email address
+      app.get('/manageAllFoods/:email', async (req, res) => {
+        const email = req.params.email;
+        console.log(email)
+        const result = await foodCollection
+       .find({ email })
+       .toArray()
+        res.send(result);
+        console.log(result)
+      })
+
+
+
+
       // get foods by search
       app.get("/searchfoods/:search", async (req, res) => {
         const search = req.params.search;
