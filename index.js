@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
@@ -7,13 +9,31 @@ const port = process.env.port || 5000;
 
 // middlewares
 const corsOptions = {
-  origin: ["*", "http://localhost:5173", "http://localhost:5174"],
+  origin: [ "http://localhost:5173", "http://localhost:5174"],
   credentials: true,
   optionSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
 app.use(express.json());
-//   app.use(cookieParser())
+app.use(cookieParser());
+
+// verify jwt middleWare
+const verifyToken = (req, res, next) => {
+  const token = req.cookies?.token;
+  if (!token) return res.status(401).send({ message: "unauthorized access" });
+  if (token) {
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+      if (err) {
+        console.log(err);
+        return res.status(401).send({ message: "unauthorized access" });
+      }
+      console.log(decoded);
+
+      req.user = decoded;
+      next();
+    });
+  }
+};
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.iu3pv7s.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -33,7 +53,41 @@ async function run() {
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
     const foodCollection = client.db("unityPlates").collection("foods");
-    const requestedCollection = client.db("unityPlates").collection("requstedFoods");
+    const requestedCollection = client
+      .db("unityPlates")
+      .collection("requstedFoods");
+
+    // MARK: jwt generate
+    app.post("/jwt", async (req, res) => {
+      try {
+        const user = req.body;
+        const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+          expiresIn: "7d",
+        });
+        res
+          .cookie("token", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+          })
+          .send({ succes: true });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+
+    // Clear token on logout
+    app.get("/logout", (req, res) => {
+      res
+        .clearCookie("token", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+          maxAge: 0,
+        })
+        .send({ success: true });
+    });
 
     // create and add a new food to the collection
     app.post("/postedfoods", async (req, res) => {
@@ -50,36 +104,19 @@ async function run() {
       // console.log(result)
     });
 
-    // get the requested food from the database || requsted foods
-    app.get("/getMyFoods/:email", async (req, res) => {
+    // MARK:REQUESTEDfoods get the requested food
+    app.get("/getMyFoods/:email", verifyToken, async (req, res) => {
+      const tokenEmail = req.user.email;
       const email = req.params.email;
-      const result = await requestedCollection.find({ email }).toArray();
+      if (tokenEmail !== email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const query = { requestorEmail: email };
+      const result = await requestedCollection.find(query).toArray();
       res.send(result);
+      // console.log(result);
     });
 
-    // dithced the get requested fooods by email 
-    // MARK:REQUESTEDfoods get the requested food from the database by email 
-    // app.get("/getMyFoods", async (req, res) => {
-    //   // const email = req.params.email;
-    //   const result = await requestedCollection
-    //     // .find({ requestorEmail: email }) // Match with requestorEmail
-    //     .toArray();
-    //   res.send(result);
-    // });
-    
-    
-    /**
-     * MARK:REQUESTEDfoods get the requested food from the database /n
-     *   and made the email handling logic from fronend 
-     **/ 
-    
-    app.get("/getMyFoods", async (req, res) => {
-      const result = await requestedCollection
-      .find({})
-      .toArray();
-      res.send(result);
-      console.log(result);
-    });
 
     //  get the data from db to show on the website (6 cards)
     app.get("/foods", async (req, res) => {
@@ -112,8 +149,13 @@ async function run() {
     });
 
     // get the all foods by email address
-    app.get("/manageAllFoods/:email", async (req, res) => {
+    app.get("/manageAllFoods/:email", verifyToken, async (req, res) => {
+      const tokenEmail = req.user.email;
+      console.log(tokenEmail)
       const email = req.params.email;
+      if (tokenEmail!== email) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
       const result = await foodCollection
         .find({ "userDetails.email": email })
         .toArray();
@@ -135,11 +177,11 @@ async function run() {
       console.log(id);
       const result = await foodCollection.findOne({ _id: new ObjectId(id) });
       res.send(result);
-      console.log(result);
+      // console.log(result);
     });
 
     // update a specific foods data by it's id
-    app.put("/updatesFoodData/:id", async (req, res) => {
+    app.put("/updatesFoodData/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const updatedFood = req.body;
       const result = await foodCollection.updateOne(
