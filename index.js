@@ -54,8 +54,10 @@ async function run() {
 
     // get the requested food from the database || requsted foods
     app.get("/getMyFoods/:email", async (req, res) => {
+      const email = req.params.email;
+      // console.log(email)
       const result = await requstedCollection
-      .find({ email: req.params.email })
+      .find({ email })
       .toArray();
       res.send(result);
       // console.log(result);
@@ -97,18 +99,14 @@ async function run() {
       // get the all foods by email address
       app.get('/manageAllFoods/:email', async (req, res) => {
         const email = req.params.email;
-        console.log(email)
-        const result = await foodCollection
-       .find({ email })
-       .toArray()
+        const result = await foodCollection.find({ "userDetails.email" : email }).toArray()
         res.send(result);
-        console.log(result)
       })
 
 
 
 
-      // get foods by search
+      // get foods by search || from Available foods page
       app.get("/searchfoods/:search", async (req, res) => {
         const search = req.params.search;
         const result = await foodCollection
@@ -120,7 +118,20 @@ async function run() {
       // get foods details with id
       app.get("/fooddetails/:id", async (req, res) => {
         const id = req.params.id;
+        console.log(id)
         const result = await foodCollection.findOne({ _id: new ObjectId(id) });
+        res.send(result);
+        console.log(result)
+      });
+
+      // update a specific foods data by it's id
+      app.put("/updatesFoodData/:id", async (req, res) => {
+        const id = req.params.id;
+        const updatedFood = req.body;
+        const result = await foodCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updatedFood }
+        );
         res.send(result);
       });
 
