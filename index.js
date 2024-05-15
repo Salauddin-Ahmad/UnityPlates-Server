@@ -121,8 +121,6 @@ async function run() {
       // console.log(result);
     });
 
-
-    
     //  get the data from db to show on the website (6 cards)
     app.get("/foods", async (req, res) => {
       const result = await foodCollection
@@ -150,13 +148,11 @@ async function run() {
         .sort({ expiredDate: -1 })
         .toArray();
       res.send(result);
-      // console.log(result);
     });
 
     // get the all foods by email address
     app.get("/manageAllFoods/:email", verifyToken, async (req, res) => {
       const tokenEmail = req.user.email;
-      // console.log(tokenEmail)
       const email = req.params.email;
       if (tokenEmail !== email || tokenEmail == null) {
         return res.status(403).send({ message: "forbidden access" });
@@ -217,7 +213,7 @@ async function run() {
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-  res.send("UNITY PLATE CRUD IS RUNNING");
+  res.send("UNITY PLATES SERVER IS OK");
 });
 app.listen(port, () => {
   console.log(`server is running on port ${port}`);
