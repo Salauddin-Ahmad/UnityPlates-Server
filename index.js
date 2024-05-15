@@ -9,7 +9,11 @@ const port = process.env.port || 5000;
 
 // middlewares
 const corsOptions = {
-  origin: [ "http://localhost:5173", "http://localhost:5174"],
+  origin: ["http://localhost:5173",
+   "http://localhost:5174",
+   "https://unityplate-3fee4.web.app",
+  "https://unityplate-3fee4.firebaseapp.com"
+  ],
   credentials: true,
   optionSuccessStatus: 200,
 };
@@ -17,7 +21,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 
-// verify jwt middleWare
+// MARK:jwt verify  middleWare
 const verifyToken = (req, res, next) => {
   const token = req.cookies?.token;
   if (!token) return res.status(401).send({ message: "unauthorized access" });
@@ -27,7 +31,7 @@ const verifyToken = (req, res, next) => {
         console.log(err);
         return res.status(401).send({ message: "unauthorized access" });
       }
-      console.log(decoded);
+      // console.log(decoded);
 
       req.user = decoded;
       next();
@@ -49,7 +53,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
     const foodCollection = client.db("unityPlates").collection("foods");
@@ -118,6 +122,7 @@ async function run() {
     });
 
 
+    
     //  get the data from db to show on the website (6 cards)
     app.get("/foods", async (req, res) => {
       const result = await foodCollection
@@ -151,9 +156,9 @@ async function run() {
     // get the all foods by email address
     app.get("/manageAllFoods/:email", verifyToken, async (req, res) => {
       const tokenEmail = req.user.email;
-      console.log(tokenEmail)
+      // console.log(tokenEmail)
       const email = req.params.email;
-      if (tokenEmail!== email) {
+      if (tokenEmail !== email || tokenEmail == null) {
         return res.status(403).send({ message: "forbidden access" });
       }
       const result = await foodCollection
@@ -174,14 +179,18 @@ async function run() {
     // get single foods details with id
     app.get("/fooddetails/:id", async (req, res) => {
       const id = req.params.id;
-      console.log(id);
       const result = await foodCollection.findOne({ _id: new ObjectId(id) });
       res.send(result);
-      // console.log(result);
     });
 
     // update a specific foods data by it's id
     app.put("/updatesFoodData/:id", verifyToken, async (req, res) => {
+      const tokenEmail = req.user.email;
+      const email = req.params.email;
+      if (!tokenEmail) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+
       const id = req.params.id;
       const updatedFood = req.body;
       const result = await foodCollection.updateOne(
@@ -197,7 +206,6 @@ async function run() {
       const result = await foodCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
-
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
